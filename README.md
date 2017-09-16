@@ -4,9 +4,8 @@ The use case is as follows. We start by modeling your data. This module will mod
 
 Once the model is built, you can use it to analyze test data interactively. We seek to answer these questions:
 
-(1) how probable are predicted outcomes by different classifiers? and
-
-(2) how agreeable are the classifiers for the test data set?
+1. How probable are predicted outcomes by different classifiers?
+2. How agreeable are the classifiers for the test data set?
 
 ## Features
 
