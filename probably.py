@@ -1,5 +1,6 @@
 import pandas
 import numpy
+from scipy.spatial.distance import cosine
 from sklearn.model_selection import StratifiedKFold, KFold, ShuffleSplit
 # from sklearn.model_selection import cross_val_score, cross_validate
 from sklearn.metrics import classification_report
@@ -13,6 +14,8 @@ from bokeh.models import FuncTickFormatter, FixedTicker
 from bokeh.palettes import Category10, Category20
 from bokeh.models import ColumnDataSource, HoverTool, Legend, Span, Range1d
 from bokeh.layouts import row, column, widgetbox
+from bokeh.models.widgets import Div, PreText, DataTable, TableColumn
+from sklearn.metrics import jaccard_similarity_score
 
 #----------------------------------------------------------------
 class Model(object):
@@ -134,23 +137,56 @@ class Model(object):
 				prob = { t:probs[:,i] for i,t in enumerate(model.classes_) },
 				pred = model.predict(X),
 			)
+
 		figs = []
 		for i, target in enumerate(model.classes_):
 			fig = self.plot(X, P, target)
 			figs.append(fig)
+
 		for i in range(len(figs)):
 			if i > 0:
 				figs[i].y_range = figs[0].y_range
 				figs[i].yaxis.visible = False
 		figs[-1].toolbar_location = 'right'
 		figs[-1].width = 430
-		layout = row(figs)
+
+		# Plot pairwise correlation and similarity
+		classes = {}
+		for name in self.models:
+			for c in model.classes_:
+				classes[c] = { name : P[name]['prob'][c] for name in P }
+			break
+		df_prob = { c : pandas.DataFrame(p) for c,p in classes.items() }
+		df_prob_corr = { c: df_prob[c].corr().round(2) for c in classes }
+		corr_text = [
+			Div(
+				text="<h3>Pairwise correlation class {}</32><pre>{}</pre>".format(
+					c, str(df_prob_corr[c])),
+				width=400
+			) for c in classes
+		]
+
+		jaccard = {}
+		for n1 in self.models:
+			jaccard[n1] = []
+			for n2 in self.models:
+				jaccard[n1].append(jaccard_similarity_score(P[n1]['pred'], P[n2]['pred']))
+
+		df_jaccard = pandas.DataFrame(jaccard,
+			columns=self.models.keys(), index=self.models.keys()).round(2)
+		jaccard_text = [
+			Div(text="<h3>Jaccard prediction similarity</h3><pre>{}</pre>".format(
+					str(df_jaccard)), width=400)
+		]
+
+		# Layout figures
+		layout = column(row(figs), row(corr_text[0], corr_text[1]), row(jaccard_text))
 		show(layout)
 
 	#----------------------------------------------------------------
 	def plot(self, X, prediction, target):
 		COLOR = Category10[10]
-		plot_width = 400
+		plot_width, plot_height, num_points = 400, 400, 10
 		tooltips = [
 			('Prediction', 'Class @predicted (@classifier)'),
 			('Probability, Entropy', '@prob, @entropy'),
@@ -170,9 +206,10 @@ class Model(object):
 			toolbar_location=None,
 			logo = None,
 			plot_width = plot_width,
+			plot_height = plot_height,
 		)
-		if len(X) > 20:
-			fig.y_range = Range1d(len(X)/2 - 10.5, len(X)/2 + 10.5)
+		if len(X) > num_points:
+			fig.y_range = Range1d(len(X)/2 - (num_points*0.5+0.5), len(X)/2 + (num_points*0.5+0.5))
 		fig.xaxis.ticker = FixedTicker(ticks=numpy.arange(0,1.1,0.1))
 		fig.yaxis.ticker = FixedTicker(ticks=numpy.arange(0,len(X)))
 		fig.xgrid.grid_line_color = None
@@ -226,27 +263,28 @@ class Model(object):
 		)
 		fig.add_layout(legend, 'above')
 		return fig
+
 #----------------------------------------------------------------
+if __name__ == '__main__':
+	model = Model('data/admission.csv')
+	model.define(
+		features = ['gre', 'gpa', 'rank'],
+		target = 'admit',
+		cv = KFold(10,True),
+	)
+	data = pandas.read_csv('data/admission.csv')
+	test_data = data.sample(50)[['gre', 'gpa', 'rank']]
+	# model.evaluate(0)
+	model.predict(test_data)
 
-model = Model('data/admission.csv')
-model.define(
-	features = ['gre', 'gpa', 'rank'],
-	target = 'admit',
-	cv = KFold(10,True),
-)
-data = pandas.read_csv('data/admission.csv')
-test_data = data.sample(50)[['gre', 'gpa', 'rank']]
-# model.evaluate(0)
-model.predict(test_data)
-
-# model = Model('data/iris.csv')
-# model.define(
-# 	features = ['SepalWidth','SepalLength','PetalWidth','PetalLength'],
-# 	target = 'Species',
-# 	cv = KFold(10,True),
-# )
-# data = pandas.read_csv('data/iris.csv')
-# test_data = data.sample(5)[['SepalWidth','SepalLength','PetalWidth','PetalLength']]
-# model.evaluate('versicolor')
-# model.predict(test_data)
+	# model = Model('data/iris.csv')
+	# model.define(
+	# 	features = ['SepalWidth','SepalLength','PetalWidth','PetalLength'],
+	# 	target = 'Species',
+	# 	cv = KFold(10,True),
+	# )
+	# data = pandas.read_csv('data/iris.csv')
+	# test_data = data.sample(5)[['SepalWidth','SepalLength','PetalWidth','PetalLength']]
+	# model.evaluate('versicolor')
+	# model.predict(test_data)
 
