@@ -34,7 +34,12 @@ class Model(object):
 
 	#----------------------------------------------------------------
 	def define(self, data, features, target, cv=ShuffleSplit(10, test_size=0.1)):
-		df = pandas.read_csv(data)
+		if type(data) == pandas.DataFrame:
+			df = data
+		elif type(data) == str:
+			df = pandas.read_csv(data)
+		else:
+			raise Exception('data must be either a string (csv file) or Pandas.DataFrame.')
 		self.features = features
 		self.target = target
 		self.cv = cv
@@ -123,6 +128,9 @@ class Model(object):
 
 	#----------------------------------------------------------------
 	def predict(self, X):
+		if type(X) != pandas.DataFrame:
+			raise Exception('input must be of type pandas.DataFrame.')
+
 		P = {}
 		output_file('prediction.html')
 		# predict with model[0]
