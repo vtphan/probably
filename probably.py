@@ -160,7 +160,7 @@ class Model(object):
 		df_prob_corr = { c: df_prob[c].corr().round(2) for c in classes }
 		corr_text = [
 			Div(
-				text="<h3>Pairwise correlation class {}</32><pre>{}</pre>".format(
+				text="<h3>Pairwise correlation class {}</h3><pre>{}</pre>".format(
 					c, str(df_prob_corr[c])),
 				width=400
 			) for c in classes
@@ -180,7 +180,7 @@ class Model(object):
 		]
 
 		# Layout figures
-		layout = column(row(figs), row(corr_text[0], corr_text[1]), row(jaccard_text))
+		layout = column(row(figs), row(*corr_text), row(jaccard_text))
 		show(layout)
 
 	#----------------------------------------------------------------
@@ -277,14 +277,14 @@ if __name__ == '__main__':
 	# model.evaluate(0)
 	model.predict(test_data)
 
-	# model = Model('data/iris.csv')
-	# model.define(
-	# 	features = ['SepalWidth','SepalLength','PetalWidth','PetalLength'],
-	# 	target = 'Species',
-	# 	cv = KFold(10,True),
-	# )
-	# data = pandas.read_csv('data/iris.csv')
-	# test_data = data.sample(5)[['SepalWidth','SepalLength','PetalWidth','PetalLength']]
+	model = Model('data/iris.csv')
+	model.define(
+		features = ['SepalWidth','SepalLength','PetalWidth','PetalLength'],
+		target = 'Species',
+		cv = KFold(10,True),
+	)
+	data = pandas.read_csv('data/iris.csv')
+	test_data = data.sample(15)[['SepalWidth','SepalLength','PetalWidth','PetalLength']]
 	# model.evaluate('versicolor')
-	# model.predict(test_data)
+	model.predict(test_data)
 
