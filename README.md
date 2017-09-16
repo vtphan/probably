@@ -31,7 +31,15 @@ model.predict(test_data)
 The output is an html file (built using Python Bokeh), from which you can
 interactively analyze predicted data.
 
-## Support classification algorithms (scikit)
+## Required Python 3 packages
+
+- bokeh
+- numpy
+- pandas
+- scipy
+- scikit-learn
+
+## Supported classification algorithms
 
 - Gaussian process
 - Gradient boosting
@@ -39,7 +47,7 @@ interactively analyze predicted data.
 - Random forrest
 - Support vector machine
 
-## Examples
+## Snapshots of visualizations
 
 ##### Iris data set
 <img src="Figs/probably_iris.png">
