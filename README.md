@@ -7,16 +7,6 @@ import pandas
 from sklearn.model_selection import KFold
 from probably import Model
 
-model = Model('data/admission.csv')
-model.define(
-	features = ['gre', 'gpa', 'rank'],
-	target = 'admit',
-	cv = KFold(10,True),
-)
-data = pandas.read_csv('data/admission.csv')
-test_data = data.sample(50)[['gre', 'gpa', 'rank']]
-model.predict(test_data)
-
 model = Model('data/iris.csv')
 model.define(
 	features = ['SepalWidth','SepalLength','PetalWidth','PetalLength'],

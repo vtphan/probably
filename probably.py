@@ -259,26 +259,5 @@ class Model(object):
 		return fig
 
 #----------------------------------------------------------------
-if __name__ == '__main__':
-	model = Model('data/admission.csv')
-	model.define(
-		features = ['gre', 'gpa', 'rank'],
-		target = 'admit',
-		cv = KFold(10,True),
-	)
-	data = pandas.read_csv('data/admission.csv')
-	test_data = data.sample(50)[['gre', 'gpa', 'rank']]
-	# model.evaluate(0)
-	model.predict(test_data)
 
-	model = Model('data/iris.csv')
-	model.define(
-		features = ['SepalWidth','SepalLength','PetalWidth','PetalLength'],
-		target = 'Species',
-		cv = KFold(10,True),
-	)
-	data = pandas.read_csv('data/iris.csv')
-	test_data = data.sample(15)[['SepalWidth','SepalLength','PetalWidth','PetalLength']]
-	# model.evaluate('versicolor')
-	model.predict(test_data)
 
