@@ -16,12 +16,11 @@ from bokeh.models import ColumnDataSource, HoverTool, Legend, Span, Range1d
 from bokeh.layouts import row, column, widgetbox
 from bokeh.models.widgets import Div, PreText, DataTable, TableColumn
 from sklearn.metrics import jaccard_similarity_score
+from sklearn.externals import joblib
 
 #----------------------------------------------------------------
 class Model(object):
-	def __init__(self, input_file, title=None):
-		self.df = pandas.read_csv(input_file)
-
+	def __init__(self):
 		# self.models[0] built on whole dataset to predict new data.
 		# self.models[1] built on partial dataset to evaluate.
 		self.models = {
@@ -32,15 +31,15 @@ class Model(object):
 			'svc' : [SVC(probability=True),SVC(probability=True)],
 			# 'dt' : [DecisionTreeClassifier(), DecisionTreeClassifier()],
 		}
-		self.title = title
 
 	#----------------------------------------------------------------
-	def define(self, features, target, cv=ShuffleSplit(10, test_size=0.1)):
+	def define(self, data, features, target, cv=ShuffleSplit(10, test_size=0.1)):
+		df = pandas.read_csv(data)
 		self.features = features
 		self.target = target
 		self.cv = cv
-		self.X = self.df[features]
-		self.y = self.df[target]
+		self.X = df[features]
+		self.y = df[target]
 		for name, model in self.models.items():
 			model[0].fit(self.X, self.y)
 
@@ -191,7 +190,6 @@ class Model(object):
 			names = [str(target)],
 		)
 		fig = figure(
-			# title=self.title,
 			x_axis_label='Probability of class {}'.format(target),
 			y_axis_label='Samples',
 			x_range = (0,1),
@@ -258,6 +256,15 @@ class Model(object):
 		fig.add_layout(legend, 'above')
 		return fig
 
-#----------------------------------------------------------------
+	#----------------------------------------------------------------
+	def save(self, output_file='output.pkl'):
+		print('Saving model to', output_file)
+		joblib.dump(self.models, output_file)
+
+	def load(self, input_file):
+		print('Loading model from', input_file)
+		self.models = joblib.load(input_file)
+
+	#----------------------------------------------------------------
 
 
