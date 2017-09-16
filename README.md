@@ -1,6 +1,6 @@
 Analyze interactively predictions using different probabilistic machine learning methods.
 
-### Features
+## Features
 
 - Visualize probability of prediction of different ML algorithms for each (test) data point.
 This sheds light on how probable predictions are, and how much different algorithms agree.
@@ -10,7 +10,7 @@ This sheds light on how probable predictions are, and how much different algorit
 - Examine each data point.
 
 
-### Usage
+## Usage
 
 ```
 import pandas
@@ -31,7 +31,15 @@ model.predict(test_data)
 The output is an html file (built using Python Bokeh), from which you can
 interactively analyze predicted data.
 
-### Examples
+## Support classification algorithms (scikit)
+
+- Gaussian process
+- Gradient boosting
+- Logistic regression
+- Random forrest
+- Support vector machine
+
+## Examples
 
 ##### Iris data set
 <img src="Figs/probably_iris.png">
