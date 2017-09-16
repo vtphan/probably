@@ -19,19 +19,34 @@ This sheds light on how probable predictions are, and how much different algorit
 
 ## Usage
 
+Model building
 ```
 import pandas
 from sklearn.model_selection import KFold
 from probably import Model
 
-model = Model('data/iris.csv')
+model = Model()
 model.define(
+	data = 'data/iris.csv',
 	features = ['SepalWidth','SepalLength','PetalWidth','PetalLength'],
 	target = 'Species',
 	cv = KFold(10,True),
 )
+model.save('iris.model')
+```
+
+Load model and data new data
+```
+import pandas
+from sklearn.model_selection import KFold
+from probably import Model
+
+
 data = pandas.read_csv('data/iris.csv')
 test_data = data.sample(15)[['SepalWidth','SepalLength','PetalWidth','PetalLength']]
+
+model = Model()
+model.load('iris.model')
 model.predict(test_data)
 ```
 
