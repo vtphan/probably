@@ -66,7 +66,7 @@ interactively analyze predicted data.
 - Gaussian process
 - Gradient boosting
 - Logistic regression
-- Random forrest
+- Random forest
 - Support vector machine
 
 ## Snapshots of visualizations
