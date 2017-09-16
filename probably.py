@@ -29,7 +29,7 @@ class Model(object):
 			'logit' : [LogisticRegression(),LogisticRegression()],
 			'gauss' : [GaussianProcessClassifier(),GaussianProcessClassifier()],
 			'gboost' : [GradientBoostingClassifier(), GradientBoostingClassifier()],
-			'rf' : [RandomForestClassifier(n_estimators=50), RandomForestClassifier(n_estimators=50)],
+			'rf' : [RandomForestClassifier(n_estimators=100), RandomForestClassifier(n_estimators=100)],
 			# 'dt' : [DecisionTreeClassifier(), DecisionTreeClassifier()],
 		}
 		self.title = title
@@ -160,7 +160,7 @@ class Model(object):
 		df_prob_corr = { c: df_prob[c].corr().round(2) for c in classes }
 		corr_text = [
 			Div(
-				text="<h3>Pairwise correlation class {}</h3><pre>{}</pre>".format(
+				text="<h3>Model correlation (class {})</h3><pre>{}</pre>".format(
 					c, str(df_prob_corr[c])),
 				width=400
 			) for c in classes
@@ -175,7 +175,7 @@ class Model(object):
 		df_jaccard = pandas.DataFrame(jaccard,
 			columns=self.models.keys(), index=self.models.keys()).round(2)
 		jaccard_text = [
-			Div(text="<h3>Jaccard prediction similarity</h3><pre>{}</pre>".format(
+			Div(text="<h3>Model prediction (Jaccard) similarity</h3><pre>{}</pre>".format(
 					str(df_jaccard)), width=400)
 		]
 
