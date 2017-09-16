@@ -25,11 +25,11 @@ class Model(object):
 		# self.models[0] built on whole dataset to predict new data.
 		# self.models[1] built on partial dataset to evaluate.
 		self.models = {
-			'svc' : [SVC(probability=True),SVC(probability=True)],
-			'logit' : [LogisticRegression(),LogisticRegression()],
 			'gauss' : [GaussianProcessClassifier(),GaussianProcessClassifier()],
 			'gboost' : [GradientBoostingClassifier(), GradientBoostingClassifier()],
-			'rf' : [RandomForestClassifier(n_estimators=100), RandomForestClassifier(n_estimators=100)],
+			'logit' : [LogisticRegression(),LogisticRegression()],
+			'rf' : [RandomForestClassifier(n_estimators=100),RandomForestClassifier(n_estimators=100)],
+			'svc' : [SVC(probability=True),SVC(probability=True)],
 			# 'dt' : [DecisionTreeClassifier(), DecisionTreeClassifier()],
 		}
 		self.title = title
@@ -82,10 +82,6 @@ class Model(object):
 					score = self.score(y_test, y_pred_test, target)
 					for i in range(4):
 						scores_test[t][name][i] += score[i]
-
-					# print(y_test)
-					# print(y_pred_test)
-					# classification_report(y_test,y_pred_test)
 
 			for name in scores_train[t]:
 				for i in range(4):
@@ -152,10 +148,8 @@ class Model(object):
 
 		# Plot pairwise correlation and similarity
 		classes = {}
-		for name in self.models:
-			for c in model.classes_:
-				classes[c] = { name : P[name]['prob'][c] for name in P }
-			break
+		for c in model.classes_:
+			classes[c] = { name : P[name]['prob'][c] for name in self.models }
 		df_prob = { c : pandas.DataFrame(p) for c,p in classes.items() }
 		df_prob_corr = { c: df_prob[c].corr().round(2) for c in classes }
 		corr_text = [
