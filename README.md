@@ -1,8 +1,12 @@
 Analyze interactively predictions using different probabilistic machine learning methods.
 
-The use case is as follows. You start by modeling your data. This module will model your data using different probabilitisic classifiers.  A probabilistic machine classifer associates a probability with each prediction.
+The use case is as follows. We start by modeling your data. This module will model your data using different probabilitisic classifiers.  A probabilistic machine classifer associates a probability with each prediction.
 
-Once the model is built, you can use it to analyze test data interactively. We seek to answer these questions: (1) how probable are predicted outcomes by different classifiers? and (2) how agreeable are the classifiers for the test data set?
+Once the model is built, you can use it to analyze test data interactively. We seek to answer these questions:
+
+(1) how probable are predicted outcomes by different classifiers? and
+
+(2) how agreeable are the classifiers for the test data set?
 
 ## Features
 
