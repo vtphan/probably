@@ -9,14 +9,22 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
+from sklearn.metrics import jaccard_similarity_score
+from sklearn.externals import joblib
 from bokeh.plotting import figure, output_file, show
 from bokeh.models import FuncTickFormatter, FixedTicker
 from bokeh.palettes import Category10, Category20
 from bokeh.models import ColumnDataSource, HoverTool, Legend, Span, Range1d
 from bokeh.layouts import row, column, widgetbox
-from bokeh.models.widgets import Div, PreText, DataTable, TableColumn
-from sklearn.metrics import jaccard_similarity_score
-from sklearn.externals import joblib
+from bokeh.models.widgets import Div, Slider
+from bokeh.models.callbacks import CustomJS
+import time
+#----------------------------------------------------------------
+LAST_TIME = time.time()
+def timer():
+	global LAST_TIME
+	print('Time: ', round((time.time() - LAST_TIME), 3))
+	LAST_TIME = time.time()
 
 #----------------------------------------------------------------
 class Model(object):
@@ -34,10 +42,7 @@ class Model(object):
 			self.info['cv'] = cv
 			self.info['features'] = features
 			self.info['target'] = target
-			self.info['accuracy'] = {}
-			self.info['precision'] = {}
-			self.info['recall'] = {}
-			self.info['specificity'] = {}
+			self.info['scores'] = {}
 			self.info['tp_probs'] = {}
 			self.info['fp_probs'] = {}
 			if type(data) == pandas.DataFrame:
@@ -83,10 +88,12 @@ class Model(object):
 	#----------------------------------------------------------------
 	def eval_all(self):
 		for c in self.info['classifier_names']:
-			count = 0
-			acc, pre, rec, spe = 0, 0, 0, 0
 			self.info['tp_probs'][c] = { l:[] for l in self.info['labels'] }
 			self.info['fp_probs'][c] = { l:[] for l in self.info['labels'] }
+			self.info['scores'][c] = { l:numpy.array([0.0,0.0,0.0,0.0])
+										for l in self.info['labels'] }
+			count = 0
+			print('Training', c)
 			for train, test in self._splits():
 				count += 1
 				X_train, X_test, y_train, y_test = self._train_test_data(train,test)
@@ -96,21 +103,17 @@ class Model(object):
 				y_pred_test = cls.predict(X_test)
 				for i,label in enumerate(cls.classes_):
 					scores = self.score(y_test, y_pred_test, label)
-					acc += scores[0]
-					pre += scores[0]
-					rec += scores[0]
-					spe += scores[0]
-					tp_probs, fp_probs = self.tp_fp_probs(y_test,y_pred_test,y_prob_test[:,i],label)
-					self.info['tp_probs'][c][label] += tp_probs
-					self.info['fp_probs'][c][label] += fp_probs
-			self.info['accuracy'][c] = acc/count
-			self.info['precision'][c] = pre/count
-			self.info['recall'][c] = rec/count
-			self.info['specificity'][c] = spe/count
+					self.info['scores'][c][label] += scores
+					tp, fp = self.tp_fp_probs(y_test,y_pred_test,y_prob_test[:,i],label)
+					self.info['tp_probs'][c][label] += tp
+					self.info['fp_probs'][c][label] += fp
+			for l in self.info['labels']:
+				self.info['scores'][c][l] /= count
+				self.info['tp_probs'][c][l] = sorted(self.info['tp_probs'][c][l])
+				self.info['fp_probs'][c][l] = sorted(self.info['fp_probs'][c][l])
 
 	#----------------------------------------------------------------
 	# return the percentage of tp's whose probabilites are <= p
-	# SLOW NEEDS TO BE FASTER
 	#----------------------------------------------------------------
 	def tp_le(self, c, lab, probs):
 		tp_probs = self.info['tp_probs'][c][lab]
@@ -118,17 +121,36 @@ class Model(object):
 			return [ 0 ] * len(probs)
 		n = len(tp_probs)
 		return [ round(100*len([q for q in tp_probs if q<=p])/n,0) for p in probs ]
+		# perc = []
+		# for p in probs:
+		# 	count = 0
+		# 	for q in tp_probs:
+		# 		if q <= p:
+		# 			count += 1
+		# 		else:
+		# 			break
+		# 	perc.append( round(100*count/n,0 ) )
+		# return perc
 
 	#----------------------------------------------------------------
 	# return the percentage of fp's whose probabilites are > p
-	# SLOW NEEDS TO BE FASTER
 	#----------------------------------------------------------------
 	def fp_gt(self, c, lab, probs):
 		fp_probs = self.info['fp_probs'][c][lab]
 		if len(fp_probs) == 0:
 			return [ 0 ] * len(probs)
 		n = len(fp_probs)
+		perc = []
 		return [ round(100*len([q for q in fp_probs if q>p])/n,0) for p in probs ]
+		# for p in probs:
+		# 	count = 0
+		# 	for q in fp_probs:
+		# 		if q <= p:
+		# 			count += 1
+		# 		else:
+		# 			break
+		# 	perc.append( round(100*(n-count)/n,0 ) )
+		# return perc
 
 	#----------------------------------------------------------------
 	#----------------------------------------------------------------
@@ -168,12 +190,12 @@ class Model(object):
 		pre = tp/(tp+fp) if tp+fp > 0 else 0
 		rec = tp/(tp+fn) if tp+fn > 0 else 0
 		spe = tn/(tn+fp) if tp+fp > 0 else 0
-		return (tp+tn)/(tp+fp+tn+fn), pre, rec, spe
+		return numpy.array([(tp+tn)/(tp+fp+tn+fn), pre, rec, spe])
 
 	#----------------------------------------------------------------
-	def corr_tables(self, P):
+	def corr_tables(self):
 		probs = {
-			l : { c : P[c]['prob'][l] for c in self.info['classifier_names'] }
+			l : { c : self.Data[c]['prob'][l] for c in self.info['classifier_names'] }
 			for l in self.info['labels']
 		}
 		df_prob = { l : pandas.DataFrame(p) for l,p in probs.items() }
@@ -188,9 +210,9 @@ class Model(object):
 		return corr_text
 
 	#----------------------------------------------------------------
-	def sim_table(self, P):
+	def sim_table(self):
 		jaccard = {
-			n : [ jaccard_similarity_score(P[n]['pred'], P[m]['pred'])
+			n : [ jaccard_similarity_score(self.Data[n]['pred'], self.Data[m]['pred'])
 				for m in self.info['classifier_names'] ]
 				for n in self.info['classifier_names']
 		}
@@ -205,37 +227,53 @@ class Model(object):
 		return jaccard_text
 
 	#----------------------------------------------------------------
-	def predict(self, X, out='prediction.html'):
-		if type(X) != pandas.DataFrame:
+	def predict(self, X_test, out='prediction.html'):
+		if type(X_test) != pandas.DataFrame:
 			raise Exception('input must be of type pandas.DataFrame.')
 
-		P = {}
+		self.Data = {}
+		self.Votes = {}
+		self.X_test = X_test
 		for c in self.info['classifier_names']:
 			cls = self.info['classifier'][c]
-			probs = cls.predict_proba(X)
-			P[c] = dict(
-				pred = cls.predict(X),
+			probs = cls.predict_proba(X_test)
+			pred = cls.predict(X_test)
+			self.Data[c] = dict(
+				pred = pred,
 				prob = { lab : probs[:,i] for i,lab in enumerate(cls.classes_) },
 				tp = { lab : self.tp_le(c,lab,probs[:,i]) for i,lab in enumerate(cls.classes_) },
 				fp = { lab : self.fp_gt(c,lab,probs[:,i]) for i,lab in enumerate(cls.classes_) },
 			)
+		#--------------------------------------------------
+		# Count votes
+		#--------------------------------------------------
+		for l in self.info['labels']:
+			self.Votes[l] = [0] * len(self.X_test)
+			for c in self.info['classifier_names']:
+				for i,vote in enumerate(self.Data[c]['pred']):
+					if vote == l:
+						self.Votes[l][i] += 1
+		#--------------------------------------------------
+		self.init_graphics()
+		data_source = self.make_data_source()
+
+		# votes_filters = [ self.votes_slider(data_source[l]) for l in self.info['labels'] ]
 
 		#--------------------------------------------------
-		figs1 = [ self.plot_fig1(X, P, l) for l in self.info['labels'] ]
-		for i in range(len(figs1)):
-			if i > 0:
-				figs1[i].y_range = figs1[0].y_range
-		figs1[-1].toolbar_location = 'right'
-		figs1[-1].width = 420
+		figs1 = [ self.plot_fig1(l,d) for (l, d) in data_source.items() ]
+		for i in range(1, len(figs1)):
+			figs1[i].y_range = figs1[0].y_range
 
 		#--------------------------------------------------
-		figs2 = [ self.plot_fig2(X, P, l) for l in self.info['labels'] ]
+		# Plot %tp ≤ p versus %fp > p
+		#--------------------------------------------------
+		figs2 = [ self.plot_fig2(l,d) for (l, d) in data_source.items() ]
 
 		#--------------------------------------------------
 		# Plot pairwise correlation and similarity
 		#--------------------------------------------------
-		corr_tables = self.corr_tables(P)
-		sim_table = self.sim_table(P)
+		corr_tables = self.corr_tables()
+		sim_table = self.sim_table()
 
 		#--------------------------------------------------
 		# Layout figures
@@ -245,9 +283,55 @@ class Model(object):
 		show(layout)
 
 	#----------------------------------------------------------------
-	def plot_fig2(self, X, prediction, target):
-		COLOR = Category10[10]
-		plot_width, plot_height = 420, 420
+	def votes_slider(self, source):
+		def slider_callback(source=source, window=None):
+			data = source.data
+			value = cb_obj.value
+			source.change.emit()
+
+		slider = Slider(
+						start=0,
+						end=len(self.info['classifier_names']),
+						value=0,
+						step=1,
+						title="Consensus",
+						width = 200,
+						callback=CustomJS.from_py_func(slider_callback),
+		)
+		return slider
+
+	#------------------------------------------------------------
+	def filter_votes(self, data_source, min_votes=0):
+		for label in data_source:
+			for cls in data_source[label]:
+				data = data_source[label][cls].data
+				for k,seq in data.items():
+					data[k] = [s for i,s in enumerate(seq) if self.Votes[label][i]>=min_votes]
+
+	#----------------------------------------------------------------
+	def make_data_source(self):
+		N = len(self.X_test)
+		data_source = { l : {} for l in self.info['labels'] }
+		for label in self.info['labels']:
+			for cls in self.info['classifier_names']:
+				data = dict(
+					sample = numpy.arange(0, N),
+					classifier = [ cls for j in range(N) ],
+					prob = self.Data[cls]['prob'][label],
+					tp = self.Data[cls]['tp'][label],
+					fp = self.Data[cls]['fp'][label],
+					predicted = self.Data[cls]['pred'],
+					color = [ self.get_classifier_color(cls) for j in range(N) ],
+					alpha = [ 0.8 if self.Data[cls]['pred'][j]==label else 0.15 for j in range(N) ],
+				)
+				for c in self.X_test.columns:
+					data[c] = self.X_test[c]
+				data_source[label][cls] = ColumnDataSource(data=data)
+		return data_source
+
+	#----------------------------------------------------------------
+	def plot_fig2(self, target, data_source):
+		plot_width, plot_height = 410, 410
 		tooltips = [
 			('Sample', '@sample'),
 			('Prediction', 'Class @predicted (@classifier)'),
@@ -255,7 +339,7 @@ class Model(object):
 			('%TP ≤ p', '@tp%'),
 			('%FP >  p', '@fp%'),
 		]
-		tooltips += [ (name, '@{}'.format(name)) for name in X.columns  ]
+		tooltips += [ (name, '@{}'.format(name)) for name in self.X_test.columns  ]
 		hover = HoverTool(
 			tooltips = tooltips,
 			names = [str(target)],
@@ -271,33 +355,19 @@ class Model(object):
 		)
 		fig.xgrid.grid_line_color = None
 		fig.ygrid.grid_line_color = None
-		i = 0
 		plots = []
-		for k,v in prediction.items():
-			data_source = dict(
-				sample = numpy.arange(0, len(X)),
-				classifier = [ k for j in range(len(X)) ],
-				prob = v['prob'][target],
-				tp = v['tp'][target],
-				fp = v['fp'][target],
-				predicted = v['pred'],
-				color = [ COLOR[i] for j in range(len(X)) ],
-				alpha = [ p for p in v['prob'][target] ],
-			)
-			for c in X.columns:
-				data_source[c] = X[c]
-			source = ColumnDataSource(data=data_source, name=k)
+		for cls in self.Data:
 			plot = fig.circle(
 				x='tp',
 				y='fp',
 				color='color',
 				alpha='alpha',
 				size=10,
-				source=source,
+				source=data_source[cls],
 				name = str(target),
 			)
-			plots.append((k,[plot]))
-			i += 1
+			plots.append((cls,[plot]))
+
 		legend = Legend(
 			items=plots,
 			location=(0,2),
@@ -308,8 +378,7 @@ class Model(object):
 		return fig
 
 	#----------------------------------------------------------------
-	def plot_fig1(self, X, prediction, target):
-		COLOR = Category10[10]
+	def plot_fig1(self, target, data_source):
 		plot_width, plot_height, num_points = 410, 410, 10
 		tooltips = [
 			('Prediction', 'Class @predicted (@classifier)'),
@@ -317,7 +386,7 @@ class Model(object):
 			('%TP ≤ p', '@tp%'),
 			('%FP >  p', '@fp%'),
 		]
-		tooltips += [ (name, '@{}'.format(name)) for name in X.columns  ]
+		tooltips += [ (name, '@{}'.format(name)) for name in self.X_test.columns  ]
 		hover = HoverTool(
 			tooltips = tooltips,
 			names = [str(target)],
@@ -328,52 +397,32 @@ class Model(object):
 			x_range = (0,1),
 			tools = ['ypan','ywheel_zoom','reset',hover],
 			active_scroll="ywheel_zoom",
-			toolbar_location=None,
+			toolbar_location='right',
 			logo = None,
 			plot_width = plot_width,
 			plot_height = plot_height,
 		)
-		if len(X) > num_points:
-			fig.y_range = Range1d(len(X)/2 - (num_points*0.5+0.5), len(X)/2 + (num_points*0.5+0.5))
+		N = len(self.X_test)
+		if N > num_points:
+			fig.y_range = Range1d(N/2 - (num_points*0.5+0.5), N/2 + (num_points*0.5+0.5))
 		fig.xaxis.ticker = FixedTicker(ticks=numpy.arange(0,1.1,0.1))
-		fig.yaxis.ticker = FixedTicker(ticks=numpy.arange(0,len(X)))
+		fig.yaxis.ticker = FixedTicker(ticks=numpy.arange(0,N))
 		fig.xgrid.grid_line_color = None
 		fig.ygrid.grid_line_color = None
-		i = 0
 		plots = []
-		for k,v in prediction.items():
-			data_source = dict(
-				sample = numpy.arange(0, len(X)),
-				classifier = [ k for j in range(len(X)) ],
-				prob = v['prob'][target],
-				tp = v['tp'][target],
-				fp = v['fp'][target],
-				predicted = v['pred'],
-				color = [ COLOR[i] for j in range(len(X)) ],
-				alpha = [ 1 if v['pred'][j]==target else 0.3 for j in range(len(X)) ],
-			)
-			data_source['entropy'] = [
-				0 if (p<0.0001 or p>0.9999) else -(p*numpy.log2(p) + (1-p)*numpy.log2(1-p)) for p in data_source['prob']
-			]
-			for c in X.columns:
-				data_source[c] = X[c]
-			source = ColumnDataSource(data=data_source, name=k)
+		for cls in self.Data:
 			plot = fig.circle(
 				x='prob',
 				y='sample',
 				color='color',
 				alpha='alpha',
-				muted_color='color',
-				muted_alpha=0.1,
 				size=10,
-				source=source,
-				# legend=k,
+				source = data_source[cls],
 				name = str(target),
 			)
-			plots.append((k,[plot]))
-			i += 1
+			plots.append((cls,[plot]))
 
-		for i in range(len(X)):
+		for i in range(N):
 			sample_line = Span(location=i,
 				dimension='width',
 				line_color='grey',
@@ -390,6 +439,16 @@ class Model(object):
 		)
 		fig.add_layout(legend, 'above')
 		return fig
+
+	#----------------------------------------------------------------
+	def init_graphics(self):
+		COLOR = Category10[10]
+		self.classifier_color = {}
+		for i, c in enumerate(self.info['classifier_names']):
+			self.classifier_color[c] = COLOR[i]
+	#----------------------------------------------------------------
+	def get_classifier_color(self, c):
+		return self.classifier_color[c]
 
 	#----------------------------------------------------------------
 	def save(self, output_file):
