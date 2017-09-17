@@ -10,7 +10,9 @@ Once the model is built, we use it to analyze test data interactively, particula
 ## Features
 
 - Visualize probability of prediction of different ML algorithms for each (test) data point.
-This sheds light on how probable predictions are, and how much different algorithms agree.
+This allows us to see how probable predictions are, and how much different algorithms agree.
+
+- For each data point, we can see (1) probability of prediction, (2) confidence estimate of the prediction being a true positive, (3) confidence estimate of the prediction being a false positive.
 
 - Show pairwise correlation of and similarity of ML algorithms.
 
@@ -70,10 +72,14 @@ interactively analyze predicted data.
 - Random forest
 - Support vector machine
 
-## Snapshots of visualizations
-
-##### Iris data set
-<img src="Figs/probably_iris.png">
+## Example
 
 ##### Graduate school admission data set
+
+Prediction of admission into graduate school based on GRE scores, GPA, and the ranking of undergraduate schools.
+
+As an example, the figure shows a data point with GRE=800, GPA=4.0, undergrad school ranking = 3.
+For this data point, the probability of being accepted (using the default random forest classifier with 50 trees) is 0.89.  Further, 86% of true positives have probabilities less than or equal to 0.89; and only 9% of false positives have probabilities greater than 0.89.  These 3 numbers gave an assessment on the prediction of the data point.
+
+
 <img src="Figs/probably_admission.png">
