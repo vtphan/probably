@@ -37,8 +37,7 @@ model = Model(
 )
 model.save('admission.model')
 
-# data = pandas.read_csv('data/admission.csv')
-# test_data = data.sample(50, random_state=42)[['gre', 'gpa', 'rank']]
+# ...
 # model.predict(test_data)
 ```
 
