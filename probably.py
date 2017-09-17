@@ -20,99 +20,100 @@ from sklearn.externals import joblib
 
 #----------------------------------------------------------------
 class Model(object):
-	def __init__(self):
-		self.info = {}
-		self.info['model_test'] = {
-			'gauss' : GaussianProcessClassifier(),
-			'gboost' : GradientBoostingClassifier(),
-			'logit' : LogisticRegression(),
-			'rf' : RandomForestClassifier(n_estimators=100),
-			'svc' : SVC(probability=True),
-		}
-		self.info['model_evaluate'] = {
-			'gauss' : GaussianProcessClassifier(),
-			'gboost' : GradientBoostingClassifier(),
-			'logit' : LogisticRegression(),
-			'rf' : RandomForestClassifier(n_estimators=100),
-			'svc' : SVC(probability=True),
-		}
-		self.info['model_names'] = sorted(self.info['model_test'].keys())
-		self.info['classes'] = []
-		self.info['accuracy'] = {}
-		self.info['precision'] = {}
-		self.info['recall'] = {}
-		self.info['specificity'] = {}
-		self.info['tp_probs'] = {}
-		self.info['fp_probs'] = {}
-
-	#----------------------------------------------------------------
-	def get_model(self, name, version):
-		if name not in self.info['model_names']:
-			raise Exception('Unknonw model name:', name)
-		if version not in ['test', 'evaluate']:
-			raise Exception('Unknown model version:', version)
-		return self.info['model_' + version][name]
-
-	def model_names(self):
-		return self.info['model_names']
-
-	def classes(self):
-		return self.info['classes']
-
-	#----------------------------------------------------------------
-	def define(self, data, features, target, cv=ShuffleSplit(10, test_size=0.1)):
-		if type(data) == pandas.DataFrame:
-			df = data
-		elif type(data) == str:
-			df = pandas.read_csv(data)
+	def __init__(self, data=None, classifiers=None, features=None, target=None, cv=None, saved_model=None):
+		if saved_model is not None:
+			print('Loading model from', saved_model)
+			self.info = joblib.load(saved_model)
 		else:
-			raise Exception('data must be either a string (csv file) or Pandas.DataFrame.')
-		self.features = features
-		self.target = target
-		self.cv = cv
-		self.X = df[features]
-		self.y = df[target]
-		self.info['classes'] = sorted(self.y.unique())
-		for name in self.model_names():
-			print('Building', name, 'model.')
-			model = self.get_model(name, 'test')
+			self.info = {}
+			if classifiers is None:
+				classifiers = ['rf', 'logit']
+			self._select_classifiers(classifiers)
+			if cv is None:
+				cv = ShuffleSplit(10, test_size=0.1)
+			self.info['cv'] = cv
+			self.info['features'] = features
+			self.info['target'] = target
+			self.info['accuracy'] = {}
+			self.info['precision'] = {}
+			self.info['recall'] = {}
+			self.info['specificity'] = {}
+			self.info['tp_probs'] = {}
+			self.info['fp_probs'] = {}
+			if type(data) == pandas.DataFrame:
+				df = data
+			elif type(data) == str:
+				df = pandas.read_csv(data)
+			else:
+				raise Exception('data must be either a string (csv file) or Pandas.DataFrame.')
+			self.X = df[features]
+			self.y = df[target]
+			self.info['labels'] = sorted(self.y.unique())
+			self.eval_all()
+			self.fit_all()
+
+	#----------------------------------------------------------------
+	def _select_classifiers(self, classifiers):
+		self.info['classifier'] = {}
+		for c in classifiers:
+			if type(c) == str:
+				if c not in ['gauss', 'gboost', 'logit', 'rf', 'svf']:
+					raise Exception('Unknown classifier: ', c)
+				if c == 'gauss':
+					self.info['classifier']['gauss'] = GaussianProcessClassifier()
+				elif c == 'gboost':
+					self.info['classifier']['gboost'] = GradientBoostingClassifier()
+				elif c == 'logit':
+					self.info['classifier']['logit'] = LogisticRegression()
+				elif c == 'rf':
+					self.info['classifier']['rf'] = RandomForestClassifier(n_estimators=100)
+				elif c == 'svc':
+					self.info['classifier']['svc'] = SVC(probability=True)
+			elif type(c)==tuple and len(c)==2:
+				self.info['classifier'][c[0]] = c[1]
+		self.info['classifier_names'] = sorted(self.info['classifier'].keys())
+
+	#----------------------------------------------------------------
+	def fit_all(self):
+		for c in self.info['classifier_names']:
+			print('Building', c, 'model.')
+			model = self.info['classifier'][c]
 			model.fit(self.X, self.y)
 
-		for name in self.model_names():
+	#----------------------------------------------------------------
+	def eval_all(self):
+		for c in self.info['classifier_names']:
 			count = 0
 			acc, pre, rec, spe = 0, 0, 0, 0
-			self.info['tp_probs'][name] = { c:[] for c in self.classes() }
-			self.info['fp_probs'][name] = { c:[] for c in self.classes() }
+			self.info['tp_probs'][c] = { l:[] for l in self.info['labels'] }
+			self.info['fp_probs'][c] = { l:[] for l in self.info['labels'] }
 			for train, test in self._splits():
 				count += 1
 				X_train, X_test, y_train, y_test = self._train_test_data(train,test)
-				model = self.get_model(name, 'evaluate')
-				model.fit(X_train, y_train)
-				# y_prob_train = model.predict_proba(X_train)
-				# y_pred_train = model.predict(X_train)
-				# print(name, model.score(X_test, y_test))
-				y_prob_test = model.predict_proba(X_test)
-				y_pred_test = model.predict(X_test)
-				for i,c in enumerate(model.classes_):
-					scores = self.score(y_test, y_pred_test, c)
+				cls = self.info['classifier'][c]
+				cls.fit(X_train, y_train)
+				y_prob_test = cls.predict_proba(X_test)
+				y_pred_test = cls.predict(X_test)
+				for i,label in enumerate(cls.classes_):
+					scores = self.score(y_test, y_pred_test, label)
 					acc += scores[0]
 					pre += scores[0]
 					rec += scores[0]
 					spe += scores[0]
-					tp_probs, fp_probs = self.tp_fp_probs(y_test, y_pred_test, y_prob_test[:,i], c)
-					self.info['tp_probs'][name][c] += tp_probs
-					self.info['fp_probs'][name][c] += fp_probs
-			self.info['accuracy'][name] = acc/count
-			self.info['precision'][name] = pre/count
-			self.info['recall'][name] = rec/count
-			self.info['specificity'][name] = spe/count
+					tp_probs, fp_probs = self.tp_fp_probs(y_test,y_pred_test,y_prob_test[:,i],label)
+					self.info['tp_probs'][c][label] += tp_probs
+					self.info['fp_probs'][c][label] += fp_probs
+			self.info['accuracy'][c] = acc/count
+			self.info['precision'][c] = pre/count
+			self.info['recall'][c] = rec/count
+			self.info['specificity'][c] = spe/count
 
 	#----------------------------------------------------------------
 	# return the percentage of tp's whose probabilites are <= p
 	# SLOW NEEDS TO BE FASTER
 	#----------------------------------------------------------------
-	def tp_le(self, name, c, probs):
-		tp_probs = self.info['tp_probs'][name][c]
+	def tp_le(self, c, lab, probs):
+		tp_probs = self.info['tp_probs'][c][lab]
 		if len(tp_probs) == 0:
 			return [ 0 ] * len(probs)
 		n = len(tp_probs)
@@ -122,8 +123,8 @@ class Model(object):
 	# return the percentage of fp's whose probabilites are > p
 	# SLOW NEEDS TO BE FASTER
 	#----------------------------------------------------------------
-	def fp_gt(self, name, c, probs):
-		fp_probs = self.info['fp_probs'][name][c]
+	def fp_gt(self, c, lab, probs):
+		fp_probs = self.info['fp_probs'][c][lab]
 		if len(fp_probs) == 0:
 			return [ 0 ] * len(probs)
 		n = len(fp_probs)
@@ -141,64 +142,16 @@ class Model(object):
 
 	#----------------------------------------------------------------
 	def _splits(self):
-		if type(self.cv) == StratifiedKFold:
-			return self.cv.split(self.X, self.y)
+		if type(self.info['cv']) == StratifiedKFold:
+			return self.info['cv'].split(self.X, self.y)
 		else:
-			return self.cv.split(self.X)
+			return self.info['cv'].split(self.X)
 
 	#----------------------------------------------------------------
 	# return X_train, X_test, y_train, y_test
+	#----------------------------------------------------------------
 	def _train_test_data(self, train, test):
 		return self.X.iloc[train], self.X.iloc[test], self.y.iloc[train], self.y.iloc[test]
-
-	#----------------------------------------------------------------
-	def evaluate(self, target):
-		thresholds = numpy.arange(0.4,0.7,0.05)
-		scores_test = {}
-		scores_train = {}
-		for t in thresholds:
-			print('Threshold = {}'.format(t))
-			scores_test[t] = {'svc':[0,0,0,0], 'logit':[0,0,0,0], 'gauss':[0,0,0,0], 'gboost':[0,0,0,0,0], 'rf':[0,0,0,0,0]}
-			scores_train[t] = scores_test[t].copy()
-			for train, test in self._splits():
-				X_train, X_test, y_train, y_test = self._train_test_data(train,test)
-				for name in self.model_names():
-					model = self.get_model(name, 'evaluate')
-					model.fit(X_train, y_train)
-
-					y_prob_train = model.predict_proba(X_train)
-					y_pred_train = self._predict_with_prob(y_prob_train, model.classes_, target, t)
-					score = self.score(y_train, y_pred_train, target)
-					for i in range(4):
-						scores_train[t][name][i] += score[i]
-
-					y_prob_test = model.predict_proba(X_test)
-					y_pred_test = self._predict_with_prob(y_prob_test, model.classes_, target, t)
-					score = self.score(y_test, y_pred_test, target)
-					for i in range(4):
-						scores_test[t][name][i] += score[i]
-
-			for name in scores_train[t]:
-				for i in range(4):
-					scores_train[t][name][i] = scores_train[t][name][i] / self.cv.n_splits
-			for name in scores_test[t]:
-				for i in range(4):
-					scores_test[t][name][i] = scores_test[t][name][i] / self.cv.n_splits
-		for t in scores_test:
-			for name in scores_test[t]:
-				print('{} {} {}'.format(t,name,[ round(v,2) for v in scores_test[t][name]]))
-
-	#----------------------------------------------------------------
-	# Need to fix this!!!!  have to start from model's predictions
-	# then filter by threshold.
-	def _predict_with_prob(self, y_prob, labels, target, threshold):
-		target_idx = list(labels).index(target)
-		for lab in labels:
-			# THIS DOESN'T WORK FOR MULTICLASS PREDICTION
-			if lab != target:
-				nlab = lab
-		pred = [ target if p[target_idx]>=threshold else nlab for p in y_prob ]
-		return pred
 
 	#----------------------------------------------------------------
 	# return accuracy, precision, recall (sensitivity), specificity
@@ -220,17 +173,17 @@ class Model(object):
 	#----------------------------------------------------------------
 	def corr_tables(self, P):
 		probs = {
-			c : { name : P[name]['prob'][c] for name in self.model_names() }
-			for c in self.classes()
+			l : { c : P[c]['prob'][l] for c in self.info['classifier_names'] }
+			for l in self.info['labels']
 		}
-		df_prob = { c : pandas.DataFrame(p) for c,p in probs.items() }
-		df_prob_corr = { c: df_prob[c].corr().round(2) for c in probs }
+		df_prob = { l : pandas.DataFrame(p) for l,p in probs.items() }
+		df_prob_corr = { l: df_prob[l].corr().round(2) for l in probs }
 		corr_text = [
 			Div(
 				text="<h3>Model correlation (class {})</h3><pre>{}</pre>".format(
-					c, str(df_prob_corr[c])),
+					l, str(df_prob_corr[l])),
 				width=420
-			) for c in probs
+			) for l in probs
 		]
 		return corr_text
 
@@ -238,10 +191,13 @@ class Model(object):
 	def sim_table(self, P):
 		jaccard = {
 			n : [ jaccard_similarity_score(P[n]['pred'], P[m]['pred'])
-				for m in self.model_names() ] for n in self.model_names()
+				for m in self.info['classifier_names'] ]
+				for n in self.info['classifier_names']
 		}
 		df_jaccard = pandas.DataFrame(jaccard,
-			columns=self.model_names(), index=self.model_names()).round(2)
+			columns=self.info['classifier_names'],
+			index = self.info['classifier_names']
+		).round(2)
 		jaccard_text = [
 			Div(text="<h3>Model prediction (Jaccard) similarity</h3><pre>{}</pre>".format(
 					str(df_jaccard)), width=420)
@@ -254,34 +210,26 @@ class Model(object):
 			raise Exception('input must be of type pandas.DataFrame.')
 
 		P = {}
-		for name in self.model_names():
-			model = self.get_model(name, 'test')
-			probs = model.predict_proba(X)
-			P[name] = dict(
-				pred = model.predict(X),
-				prob = { c : probs[:,i] for i,c in enumerate(model.classes_) },
-				tp = { c : self.tp_le(name,c,probs[:,i]) for i,c in enumerate(model.classes_) },
-				fp = { c : self.fp_gt(name,c,probs[:,i]) for i,c in enumerate(model.classes_) },
+		for c in self.info['classifier_names']:
+			cls = self.info['classifier'][c]
+			probs = cls.predict_proba(X)
+			P[c] = dict(
+				pred = cls.predict(X),
+				prob = { lab : probs[:,i] for i,lab in enumerate(cls.classes_) },
+				tp = { lab : self.tp_le(c,lab,probs[:,i]) for i,lab in enumerate(cls.classes_) },
+				fp = { lab : self.fp_gt(c,lab,probs[:,i]) for i,lab in enumerate(cls.classes_) },
 			)
 
 		#--------------------------------------------------
-		figs1 = [ self.plot_fig1(X, P, c) for c in self.classes() ]
+		figs1 = [ self.plot_fig1(X, P, l) for l in self.info['labels'] ]
 		for i in range(len(figs1)):
 			if i > 0:
 				figs1[i].y_range = figs1[0].y_range
-				# figs1[i].yaxis.visible = False
 		figs1[-1].toolbar_location = 'right'
 		figs1[-1].width = 420
 
 		#--------------------------------------------------
-		figs2 = [ self.plot_fig2(X, P, c) for c in self.classes() ]
-		# for i in range(len(figs2)):
-		# 	if i > 0:
-		# 		figs2[i].x_range = figs2[0].x_range
-		# 		figs2[i].y_range = figs2[0].y_range
-		# 		# figs2[i].yaxis.visible = False
-		# figs2[-1].toolbar_location = 'right'
-		# figs2[-1].width = 420
+		figs2 = [ self.plot_fig2(X, P, l) for l in self.info['labels'] ]
 
 		#--------------------------------------------------
 		# Plot pairwise correlation and similarity
@@ -315,17 +263,12 @@ class Model(object):
 		fig = figure(
 			x_axis_label='% of TP w. prob ≤ p',
 			y_axis_label='% of FP w. prob > p',
-			# x_range = (0,100),
-			# y_range = (0,100),
 			tools = ['pan','box_zoom','reset',hover],
-			# active_scroll="ywheel_zoom",
 			toolbar_location='right',
 			logo = None,
 			plot_width = plot_width,
 			plot_height = plot_height,
 		)
-		# fig.xaxis.ticker = FixedTicker(ticks=numpy.arange(0,1.1,0.1))
-		# fig.yaxis.ticker = FixedTicker(ticks=numpy.arange(0,1.1,0.1))
 		fig.xgrid.grid_line_color = None
 		fig.ygrid.grid_line_color = None
 		i = 0
@@ -449,13 +392,10 @@ class Model(object):
 		return fig
 
 	#----------------------------------------------------------------
-	def save(self, output_file='output.pkl'):
+	def save(self, output_file):
 		print('Saving model to', output_file)
 		joblib.dump(self.info, output_file)
 
-	def load(self, input_file):
-		print('Loading model from', input_file)
-		self.info = joblib.load(input_file)
 
 	#----------------------------------------------------------------
 
