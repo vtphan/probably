@@ -57,8 +57,6 @@ class Model(object):
 		self.info['classifier'] = {}
 		for c in classifiers:
 			if type(c) == str:
-				if c not in ['gauss', 'gboost', 'logit', 'rf', 'svf']:
-					raise Exception('Unknown classifier: ', c)
 				if c == 'gauss':
 					self.info['classifier']['gauss'] = GaussianProcessClassifier()
 				elif c == 'gboost':
@@ -69,6 +67,8 @@ class Model(object):
 					self.info['classifier']['rf'] = RandomForestClassifier(n_estimators=100)
 				elif c == 'svc':
 					self.info['classifier']['svc'] = SVC(probability=True)
+				else:
+					raise Exception('Unknown classifier: ', c)
 			elif type(c)==tuple and len(c)==2:
 				self.info['classifier'][c[0]] = c[1]
 		self.info['classifier_names'] = sorted(self.info['classifier'].keys())
