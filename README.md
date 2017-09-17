@@ -76,7 +76,7 @@ interactively analyze predicted data.
 
 ##### Graduate school admission data set
 
-Prediction of [admission into UCLA's graduate school](https://stats.idre.ucla.edu/r/dae/logit-regression/) based on GRE scores, GPA, and the ranking of undergraduate schools.
+Prediction of [admission into UCLA's graduate school](https://stats.idre.ucla.edu/r/dae/logit-regression/) based on GRE score, GPA, and undergraduate school ranking.
 
 As an example, the figure shows a data point with GRE=800, GPA=4.0, undergrad school ranking = 3.
 For this data point, the probability of being accepted (using the default random forest classifier with 50 trees) is 0.89.  Further, 86% of true positives have probabilities less than or equal to 0.89; and only 9% of false positives have probabilities greater than 0.89.  These 3 numbers provides additional information about the prediction.
