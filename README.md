@@ -24,30 +24,31 @@ Model building
 import pandas
 from sklearn.model_selection import KFold
 from probably import Model
+from sklearn.ensemble import GradientBoostingClassifier
 
-model = Model()
-model.define(
-	data = 'data/iris.csv',
-	features = ['SepalWidth','SepalLength','PetalWidth','PetalLength'],
-	target = 'Species',
+model = Model(
+	data = 'data/admission.csv',
+	features = ['gre', 'gpa', 'rank'],
+	target = 'admit',
 	cv = KFold(10,True),
+	classifiers = [ 'rf', 'logit', ('gb', GradientBoostingClassifier()) ],
 )
-model.save('iris.model')
+model.save('admission.model')
+
+# data = pandas.read_csv('data/admission.csv')
+# test_data = data.sample(50, random_state=42)[['gre', 'gpa', 'rank']]
+# model.predict(test_data)
 ```
 
-Load model and data new data
+Load model and predict new data
 ```
 import pandas
-from sklearn.model_selection import KFold
+data = pandas.read_csv('data/admission.csv')
+test_data = data.sample(20)[['gre', 'gpa', 'rank']]
+
 from probably import Model
-
-
-data = pandas.read_csv('data/iris.csv')
-test_data = data.sample(15)[['SepalWidth','SepalLength','PetalWidth','PetalLength']]
-
-model = Model()
-model.load('iris.model')
-model.predict(test_data)
+model = Model(saved_model = 'admission.model')
+model.predict(test_data, 'prediction_saved.html')
 ```
 
 The output is an html file (built using Python Bokeh), from which you can
