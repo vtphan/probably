@@ -84,13 +84,9 @@ These packages can be easily installed if you use the Anaconda distribution.
 
 [Dataset](https://stats.idre.ucla.edu/r/dae/logit-regression/): admission into UCLA's graduate school based on GRE score, GPA, and undergraduate school ranking.
 
-The snapshot below is taken from the visualization that is the result of running the example code above.
+The snapshot below was taken from the visualization after running the code above.  This snapshot shows a data point with GRE=760, GPA=3.35, undergrad school ranking = 2.  The data point was predicted to be admited (class 1), with probability 0.83.  Further, 85% of true positives had probabilities less than or equal to 0.83; and 16% of false positives had probabilities greater than 0.83.
 
-This snapshot shows a data point with GRE=760, GPA=3.35, undergrad school ranking = 2.  The data point is predicted to be admited (class 1), with probability 0.83.  Further, 85% of true positives have probabilities less than or equal to 0.83; and 16% of false positives have probabilities greater than 0.83.
-
-In this figure, we filtered and selected only data points whose predictions are agreed by 3 or more methods.
-
-The visualization allows users to zoom, pan, hide/unhide each method.  This can be very helpful for analyzing one method or comparing two different methods.
+In this snapshot, only data with predictions agreed by 3 or more methods were selected.  The visualization allows users to zoom, pan, hide/unhide each method.  This can be very helpful for analyzing one method or comparing two different methods.
 
 
 <img src="Figs/probably_admission.png">
