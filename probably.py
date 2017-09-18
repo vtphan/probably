@@ -18,6 +18,8 @@ from bokeh.models import ColumnDataSource, HoverTool, Legend, Span, Range1d
 from bokeh.layouts import row, column, widgetbox
 from bokeh.models.widgets import Div, Slider
 from bokeh.models.callbacks import CustomJS
+from bokeh.io import curdoc
+
 import time
 #----------------------------------------------------------------
 LAST_TIME = time.time()
@@ -244,6 +246,7 @@ class Model(object):
 				tp = { lab : self.tp_le(c,lab,probs[:,i]) for i,lab in enumerate(cls.classes_) },
 				fp = { lab : self.fp_gt(c,lab,probs[:,i]) for i,lab in enumerate(cls.classes_) },
 			)
+
 		#--------------------------------------------------
 		# Count votes
 		#--------------------------------------------------
@@ -253,21 +256,34 @@ class Model(object):
 				for i,vote in enumerate(self.Data[c]['pred']):
 					if vote == l:
 						self.Votes[l][i] += 1
+
+		# for l in self.info['labels']:
+		# 	print("Label", l)
+		# 	for i in range(len(self.Votes[l])):
+		# 		a = []
+		# 		for c in self.info['classifier_names']:
+		# 			a.append(self.Data[c]['pred'][i])
+		# 		print(self.Votes[l][i], a)
+
 		#--------------------------------------------------
 		self.init_graphics()
-		data_source = self.make_data_source()
+		self.data_source = self.make_data_source()
 
-		# votes_filters = [ self.votes_slider(data_source[l]) for l in self.info['labels'] ]
+		vsource = ColumnDataSource(data=dict(ds=[0]))
+		votes_filter = self.votes_slider(vsource)
+		votes_filter.on_change('value', self.votes_filter_callback)
+
+		# self.votes_filter_callback('value', 0, 3)
 
 		#--------------------------------------------------
-		figs1 = [ self.plot_fig1(l,d) for (l, d) in data_source.items() ]
+		figs1 = [ self.plot_fig1(l,d) for (l, d) in self.data_source.items() ]
 		for i in range(1, len(figs1)):
 			figs1[i].y_range = figs1[0].y_range
 
 		#--------------------------------------------------
 		# Plot %tp ≤ p versus %fp > p
 		#--------------------------------------------------
-		figs2 = [ self.plot_fig2(l,d) for (l, d) in data_source.items() ]
+		figs2 = [ self.plot_fig2(l,d) for (l, d) in self.data_source.items() ]
 
 		#--------------------------------------------------
 		# Plot pairwise correlation and similarity
@@ -278,17 +294,42 @@ class Model(object):
 		#--------------------------------------------------
 		# Layout figures
 		#--------------------------------------------------
-		layout = column(row(figs1), row(figs2), row(*corr_tables), row(sim_table))
-		output_file(out)
-		show(layout)
+		layout = column(
+			row(votes_filter),
+			row(figs1),
+			row(figs2),
+			row(*corr_tables),
+			row(sim_table)
+		)
+		# output_file(out)
+		# show(layout)
+		curdoc().add_root(layout)
+		curdoc().title = "Probably"
 
 	#----------------------------------------------------------------
-	def votes_slider(self, source):
-		def slider_callback(source=source, window=None):
-			data = source.data
-			value = cb_obj.value
-			source.change.emit()
+	def votes_filter_callback(self, attrname, old, threshold):
+		def filter(seq):
+			return [ seq[i] for i in range(len(seq)) if votes[i]>=threshold ]
 
+		N = len(self.X_test)
+		for label in self.data_source:
+			votes = self.Votes[label]
+			for cls in self.data_source[label]:
+				data = self.data_source[label][cls].data
+				data['sample'] = [i for i in range(N) if votes[i]>=threshold]
+				data['classifier'] = [cls for i in range(N) if votes[i]>=threshold]
+				data['color'] = [ self.get_classifier_color(cls) for i in range(N) if votes[i]>=threshold ]
+				data['alpha'] = [ 0.8 if self.Data[cls]['pred'][i]==label else 0.15 for i in range(N) if votes[i]>=threshold ]
+				data['size'] = [int(13*self.Data[cls]['prob'][label][i]) for i in range(N) if votes[i]>=threshold ]
+				data['prob'] = filter(self.Data[cls]['prob'][label])
+				data['tp'] = filter(self.Data[cls]['tp'][label])
+				data['fp'] = filter(self.Data[cls]['fp'][label])
+				data['predicted'] = filter(self.Data[cls]['pred'])
+				for c in self.X_test.columns:
+					data[c] = filter(list(self.X_test[c]))
+
+	#----------------------------------------------------------------
+	def votes_slider(self, vsource):
 		slider = Slider(
 						start=0,
 						end=len(self.info['classifier_names']),
@@ -296,17 +337,8 @@ class Model(object):
 						step=1,
 						title="Consensus",
 						width = 200,
-						callback=CustomJS.from_py_func(slider_callback),
 		)
 		return slider
-
-	#------------------------------------------------------------
-	def filter_votes(self, data_source, min_votes=0):
-		for label in data_source:
-			for cls in data_source[label]:
-				data = data_source[label][cls].data
-				for k,seq in data.items():
-					data[k] = [s for i,s in enumerate(seq) if self.Votes[label][i]>=min_votes]
 
 	#----------------------------------------------------------------
 	def make_data_source(self):
@@ -323,6 +355,7 @@ class Model(object):
 					predicted = self.Data[cls]['pred'],
 					color = [ self.get_classifier_color(cls) for j in range(N) ],
 					alpha = [ 0.8 if self.Data[cls]['pred'][j]==label else 0.15 for j in range(N) ],
+					size = [ int(p*13) for p in self.Data[cls]['prob'][label] ],
 				)
 				for c in self.X_test.columns:
 					data[c] = self.X_test[c]
@@ -331,7 +364,7 @@ class Model(object):
 
 	#----------------------------------------------------------------
 	def plot_fig2(self, target, data_source):
-		plot_width, plot_height = 410, 410
+		plot_width, plot_height = 380, 380
 		tooltips = [
 			('Sample', '@sample'),
 			('Prediction', 'Class @predicted (@classifier)'),
@@ -353,8 +386,8 @@ class Model(object):
 			plot_width = plot_width,
 			plot_height = plot_height,
 		)
-		fig.xgrid.grid_line_color = None
-		fig.ygrid.grid_line_color = None
+		# fig.xgrid.grid_line_color = None
+		# fig.ygrid.grid_line_color = None
 		plots = []
 		for cls in self.Data:
 			plot = fig.circle(
@@ -362,7 +395,7 @@ class Model(object):
 				y='fp',
 				color='color',
 				alpha='alpha',
-				size=10,
+				size='size',
 				source=data_source[cls],
 				name = str(target),
 			)
@@ -379,7 +412,7 @@ class Model(object):
 
 	#----------------------------------------------------------------
 	def plot_fig1(self, target, data_source):
-		plot_width, plot_height, num_points = 410, 410, 10
+		plot_width, plot_height, num_points = 380, 380, 10
 		tooltips = [
 			('Prediction', 'Class @predicted (@classifier)'),
 			('Probability', '@prob{1.11}'),
@@ -449,6 +482,10 @@ class Model(object):
 	#----------------------------------------------------------------
 	def get_classifier_color(self, c):
 		return self.classifier_color[c]
+
+	#----------------------------------------------------------------
+	def available_classifiers(self):
+		return [ 'rf', 'logit', 'gboost', 'svc', 'gauss' ]
 
 	#----------------------------------------------------------------
 	def save(self, output_file):
