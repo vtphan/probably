@@ -54,10 +54,7 @@ Use the bokeh server to serve your app from the command line:
 bokeh serve --show yourapp.py
 ```
 
-This will open a web browser, where the data and predictions can be analyzed and visualized.
-When visualizing the data and predictions, each data point can be examined.  Associated with each data point are many attributes.
-
-It is important to know not just the probability of each prediction, but also the contexts of such prediction.  The most important 3 attributes associated with each data point are:
+This will open a web browser, where the data and predictions can be analyzed and visualized.  It is important to know not just the probability of each prediction, but also the contexts of such prediction.  The most important 3 attributes associated with each prediction are:
 
 - Probability p of the data point being predicted for a specific label/class.
 - The percentage of true positives (with respective to that label/class) with predicted probabilities less than the probability p.
@@ -85,12 +82,11 @@ These packages can be easily installed if you use the Anaconda distribution.
 
 ## Example
 
+[Dataset](https://stats.idre.ucla.edu/r/dae/logit-regression/): admission into UCLA's graduate school based on GRE score, GPA, and undergraduate school ranking.
 
-##### Graduate school admission data set
+The snapshot below is taken from the visualization that is the result of running the example code above.
 
-Prediction of [admission into UCLA's graduate school](https://stats.idre.ucla.edu/r/dae/logit-regression/) based on GRE score, GPA, and undergraduate school ranking.
-
-As an example, the figure shows a data point with GRE=760, GPA=3.35, undergrad school ranking = 2.  The data point is predicted to be admited (class 1), with probability 0.83.  Further, 85% of true positives have probabilities less than or equal to 0.83; and 16% of false positives have probabilities greater than 0.83.
+This snapshot shows a data point with GRE=760, GPA=3.35, undergrad school ranking = 2.  The data point is predicted to be admited (class 1), with probability 0.83.  Further, 85% of true positives have probabilities less than or equal to 0.83; and 16% of false positives have probabilities greater than 0.83.
 
 In this figure, we filtered and selected only data points whose predictions are agreed by 3 or more methods.
 
