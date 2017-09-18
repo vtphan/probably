@@ -1,9 +1,10 @@
 Machine learning methods often provide predictions without justification.  Fortunately, a few methods provide estimates of probabilities of their predictions being correct.  While probabilistic information can be helpful, it must be used carefully.
 
-This module helps users make sense of probabilistic estimates provided by different machine learning methods.  Naturally, we want to know two basic questions:
+This module helps users make sense of probabilistic estimates provided by different machine learning methods.  Naturally, we want to know the answers to a few basic questions:
 
 1. How probable are predicted outcomes by different classifiers?
-2. How agreeable are the classifiers for the test data set?
+2. How agreeable are the classifiers' predictions?
+3. What can we learn from prediction probabilities?
 
 The goal of this module is to get answers to these and other questions to facilitate the decision making process.
 
