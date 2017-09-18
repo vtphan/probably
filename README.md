@@ -62,7 +62,7 @@ It is important to know not just the probability of each prediction, but also th
 - The percentage of true positives (with respective to that label/class) with predicted probabilities less than the probability p.
 - The percentage of false positives (with respective to that label/class) with predicted probabilities greater than the probability p.
 
-For example, a 0.8 prediction by one method can be very different from a 0.8 prediction by another method.
+As 0.8 probability predicted by one method can be very different from the same probability predicted by another method, understanding what this probability means in the context of true and false positives predited by the same method can make it easier to make decisions.
 
 ## Required Python 3 packages
 
@@ -93,7 +93,7 @@ As an example, the figure shows a data point with GRE=760, GPA=3.35, undergrad s
 
 In this figure, we filtered and selected only data points whose predictions are agreed by 3 or more methods.
 
-By hiding and unhiding predictions of different methods, more information can be gained.
+The visualization allows users to zoom, pan, hide/unhide each method.  This can be very helpful for analyzing one method or comparing two different methods.
 
 
 <img src="Figs/probably_admission.png">
