@@ -229,7 +229,7 @@ class Model(object):
 		return jaccard_text
 
 	#----------------------------------------------------------------
-	def predict(self, X_test, out='prediction.html'):
+	def predict(self, X_test, target=None, out='prediction.html'):
 		if type(X_test) != pandas.DataFrame:
 			raise Exception('input must be of type pandas.DataFrame.')
 
@@ -257,14 +257,6 @@ class Model(object):
 					if vote == l:
 						self.Votes[l][i] += 1
 
-		# for l in self.info['labels']:
-		# 	print("Label", l)
-		# 	for i in range(len(self.Votes[l])):
-		# 		a = []
-		# 		for c in self.info['classifier_names']:
-		# 			a.append(self.Data[c]['pred'][i])
-		# 		print(self.Votes[l][i], a)
-
 		#--------------------------------------------------
 		self.init_graphics()
 		self.data_source = self.make_data_source()
@@ -273,10 +265,8 @@ class Model(object):
 		votes_filter = self.votes_slider(vsource)
 		votes_filter.on_change('value', self.votes_filter_callback)
 
-		# self.votes_filter_callback('value', 0, 3)
-
 		#--------------------------------------------------
-		figs1 = [ self.plot_fig1(l,d) for (l, d) in self.data_source.items() ]
+		figs1 = [ self.plot_fig1(l,d,target) for (l, d) in self.data_source.items() ]
 		for i in range(1, len(figs1)):
 			figs1[i].y_range = figs1[0].y_range
 
@@ -363,7 +353,7 @@ class Model(object):
 		return data_source
 
 	#----------------------------------------------------------------
-	def plot_fig2(self, target, data_source):
+	def plot_fig2(self, label, data_source):
 		plot_width, plot_height = 380, 380
 		tooltips = [
 			('Sample', '@sample'),
@@ -375,7 +365,7 @@ class Model(object):
 		tooltips += [ (name, '@{}'.format(name)) for name in self.X_test.columns  ]
 		hover = HoverTool(
 			tooltips = tooltips,
-			names = [str(target)],
+			names = [str(label)],
 		)
 		fig = figure(
 			x_axis_label='% of TP w. prob ≤ p',
@@ -397,7 +387,7 @@ class Model(object):
 				alpha='alpha',
 				size='size',
 				source=data_source[cls],
-				name = str(target),
+				name = str(label),
 			)
 			plots.append((cls,[plot]))
 
@@ -411,7 +401,7 @@ class Model(object):
 		return fig
 
 	#----------------------------------------------------------------
-	def plot_fig1(self, target, data_source):
+	def plot_fig1(self, label, data_source, target):
 		plot_width, plot_height, num_points = 380, 380, 10
 		tooltips = [
 			('Prediction', 'Class @predicted (@classifier)'),
@@ -422,10 +412,10 @@ class Model(object):
 		tooltips += [ (name, '@{}'.format(name)) for name in self.X_test.columns  ]
 		hover = HoverTool(
 			tooltips = tooltips,
-			names = [str(target)],
+			names = [str(label)],
 		)
 		fig = figure(
-			x_axis_label='Probability of class {}'.format(target),
+			x_axis_label='Probability of class {}'.format(label),
 			y_axis_label='Samples',
 			x_range = (0,1),
 			tools = ['ypan','ywheel_zoom','reset',hover],
@@ -451,19 +441,21 @@ class Model(object):
 				alpha='alpha',
 				size=10,
 				source = data_source[cls],
-				name = str(target),
+				name = str(label),
 			)
 			plots.append((cls,[plot]))
 
 		for i in range(N):
-			sample_line = Span(location=i,
-				dimension='width',
-				line_color='grey',
-				line_dash='dashed',
-				line_width=1)
+			if target is not None and label==target.iloc[i]:
+				# positive sample
+				sample_line = Span(location=i,dimension='width',
+					line_color='DarkSlateGrey',line_dash='dashed',line_width=1)
+			else:
+				# negative sample
+				sample_line = Span(location=i,dimension='width',
+					line_color='LightSlateGrey',line_dash='dotted',line_width=1)
+
 			fig.add_layout(sample_line)
-		# dline = Span(location=0.5,dimension='height',line_dash='dashed',line_width=2)
-		# fig.add_layout(dline)
 		legend = Legend(
 			items=plots,
 			location=(0,2),
