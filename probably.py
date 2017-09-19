@@ -261,8 +261,7 @@ class Model(object):
 		self.init_graphics()
 		self.data_source = self.make_data_source()
 
-		vsource = ColumnDataSource(data=dict(ds=[0]))
-		votes_filter = self.votes_slider(vsource)
+		votes_filter = self.votes_slider()
 		votes_filter.on_change('value', self.votes_filter_callback)
 
 		#--------------------------------------------------
@@ -305,7 +304,8 @@ class Model(object):
 		for label in self.data_source:
 			votes = self.Votes[label]
 			for cls in self.data_source[label]:
-				data = self.data_source[label][cls].data
+				# data = self.data_source[label][cls].data
+				data = {}
 				data['sample'] = [i for i in range(N) if votes[i]>=threshold]
 				data['classifier'] = [cls for i in range(N) if votes[i]>=threshold]
 				data['color'] = [ self.get_classifier_color(cls) for i in range(N) if votes[i]>=threshold ]
@@ -318,8 +318,10 @@ class Model(object):
 				for c in self.X_test.columns:
 					data[c] = filter(list(self.X_test[c]))
 
+				self.data_source[label][cls].data.update(data)
+
 	#----------------------------------------------------------------
-	def votes_slider(self, vsource):
+	def votes_slider(self):
 		slider = Slider(
 						start=0,
 						end=len(self.info['classifier_names']),
