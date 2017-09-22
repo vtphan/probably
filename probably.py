@@ -9,12 +9,12 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
-from sklearn.metrics import jaccard_similarity_score
+from sklearn.metrics import jaccard_similarity_score, precision_score, recall_score
 from sklearn.externals import joblib
 from bokeh.plotting import figure, output_file, show
 from bokeh.models import FuncTickFormatter, FixedTicker
 from bokeh.palettes import Category10, Category20
-from bokeh.models import ColumnDataSource, HoverTool, Legend, Span, Range1d
+from bokeh.models import ColumnDataSource, HoverTool, Legend, Span, Range1d, LabelSet
 from bokeh.layouts import row, column, widgetbox
 from bokeh.models.widgets import Div, Slider
 from bokeh.models.callbacks import CustomJS
@@ -123,16 +123,6 @@ class Model(object):
 			return [ 0 ] * len(probs)
 		n = len(tp_probs)
 		return [ round(100*len([q for q in tp_probs if q<=p])/n,0) for p in probs ]
-		# perc = []
-		# for p in probs:
-		# 	count = 0
-		# 	for q in tp_probs:
-		# 		if q <= p:
-		# 			count += 1
-		# 		else:
-		# 			break
-		# 	perc.append( round(100*count/n,0 ) )
-		# return perc
 
 	#----------------------------------------------------------------
 	# return the percentage of fp's whose probabilites are > p
@@ -144,15 +134,6 @@ class Model(object):
 		n = len(fp_probs)
 		perc = []
 		return [ round(100*len([q for q in fp_probs if q>p])/n,0) for p in probs ]
-		# for p in probs:
-		# 	count = 0
-		# 	for q in fp_probs:
-		# 		if q <= p:
-		# 			count += 1
-		# 		else:
-		# 			break
-		# 	perc.append( round(100*(n-count)/n,0 ) )
-		# return perc
 
 	#----------------------------------------------------------------
 	#----------------------------------------------------------------
@@ -265,6 +246,9 @@ class Model(object):
 		votes_filter.on_change('value', self.votes_filter_callback)
 
 		#--------------------------------------------------
+		score_fig = [ self.score_fig(target, label) for label in self.info['labels'] ]
+
+		#--------------------------------------------------
 		figs1 = [ self.plot_fig1(l,d,target) for (l, d) in self.data_source.items() ]
 		for i in range(1, len(figs1)):
 			figs1[i].y_range = figs1[0].y_range
@@ -283,8 +267,9 @@ class Model(object):
 		#--------------------------------------------------
 		# Layout figures
 		#--------------------------------------------------
+		figs1.append(widgetbox(votes_filter))
 		layout = column(
-			row(votes_filter),
+			row(score_fig),
 			row(figs1),
 			row(figs2),
 			row(*corr_tables),
@@ -353,6 +338,79 @@ class Model(object):
 					data[c] = self.X_test[c]
 				data_source[label][cls] = ColumnDataSource(data=data)
 		return data_source
+
+	#----------------------------------------------------------------
+	def score_fig(self, target, label):
+		plot_width, plot_height = 380, 380
+		tooltips = [
+			('Type', '@type'),
+			('Classifier', '@classifier'),
+			('Accuracy', '@accuracy{1.11}'),
+			('Precision', '@precision{1.11}'),
+			('Recall', '@recall{1.11}'),
+		]
+		hover = HoverTool(
+			tooltips = tooltips,
+			names = [str(label)],
+		)
+		fig = figure(
+			x_axis_label='Precision',
+			y_axis_label='Recall',
+			tools = ['pan','wheel_zoom','reset',hover],
+			toolbar_location='right',
+			logo = None,
+			plot_width = plot_width,
+			plot_height = plot_height,
+		)
+		d = dict(precision=[], recall=[], accuracy=[], classifier=[], color=[], type=[])
+		d2 = dict(precision=[], recall=[], accuracy=[], classifier=[], color=[], type=[])
+		for cls in self.Data:
+			scores = self.score(target, self.Data[cls]['pred'], label)
+			d['classifier'].append(cls)
+			d['accuracy'].append(scores[0])
+			d['precision'].append(scores[1])
+			d['recall'].append(scores[2])
+			d['color'].append(self.classifier_color[cls])
+			d['type'].append('predict')
+			d2['classifier'].append(cls)
+			d2['accuracy'].append(self.info['scores'][cls][label][0])
+			d2['precision'].append(self.info['scores'][cls][label][1])
+			d2['recall'].append(self.info['scores'][cls][label][2])
+			d2['color'].append(self.classifier_color[cls])
+			d2['type'].append('model')
+
+		data_source = ColumnDataSource(data=d)
+		plots = []
+		plot = fig.circle(
+			x='precision',
+			y='recall',
+			color='color',
+			alpha = 0.8,
+			size=7,
+			source=data_source,
+			name = str(label),
+		)
+		plots.append(('predict', [plot]))
+
+		data_source2 = ColumnDataSource(data=d2)
+		plot = fig.square(
+			x='precision',
+			y='recall',
+			color='color',
+			alpha = 0.8,
+			size=7,
+			source=data_source2,
+			name = str(label),
+		)
+		plots.append(('model', [plot]))
+		legend = Legend(
+			items=plots,
+			location=(0,2),
+			orientation='horizontal',
+			click_policy='hide',
+		)
+		fig.add_layout(legend, 'above')
+		return fig
 
 	#----------------------------------------------------------------
 	def plot_fig2(self, label, data_source):
