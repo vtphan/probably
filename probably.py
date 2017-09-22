@@ -268,7 +268,10 @@ class Model(object):
 		# Layout figures
 		#--------------------------------------------------
 		figs1.append(widgetbox(votes_filter))
+
+		desc = [ Div(text="<h3>Class {}</h3>".format(l), width=420) for l in self.info['labels'] ]
 		layout = column(
+			row(desc),
 			row(score_fig),
 			row(figs1),
 			row(figs2),
@@ -354,8 +357,8 @@ class Model(object):
 			names = [str(label)],
 		)
 		fig = figure(
-			x_axis_label='Precision',
-			y_axis_label='Recall',
+			x_axis_label='Precision'.format(label),
+			y_axis_label='Recall'.format(label),
 			tools = ['pan','wheel_zoom','reset',hover],
 			toolbar_location='right',
 			logo = None,
@@ -475,7 +478,7 @@ class Model(object):
 			names = [str(label)],
 		)
 		fig = figure(
-			x_axis_label='Probability of class {}'.format(label),
+			x_axis_label='Prediction probability'.format(label),
 			y_axis_label='Samples',
 			x_range = (0,1),
 			tools = ['ypan','ywheel_zoom','reset',hover],
